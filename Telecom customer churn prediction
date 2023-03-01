@@ -1,0 +1,250 @@
+#We have chosen Telecom customer churn prediction dataset to develop a machine learning model that can predict customers who can churn telecom service subscription in the future based on multiple factors.
+
+#1. Missing Value Check :**
+
+import numpy as np
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import GridSearchCV
+from sklearn.linear_model import SGDClassifier
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+
+churn_data = pd.read_csv('/content/Telecom_customer_churn_prediction.csv')
+churn_data.isnull().sum()
+churn_data.shape
+
+#As we can see all columns are having not null values which means there are no missing values for any feature in the dataset. We are good to move ahead for data exploration and feature selection.
+
+#2.	Data Analysis and Exploration –**
+
+pd.set_option('display.max_columns', None) 
+print(churn_data.head())
+print(churn_data.shape)
+print(churn_data.info())
+print(churn_data.describe())
+
+#3. HeatMap and Feature Selection :** 
+
+def converter(column):
+    if column == 'Yes':
+        return 1
+    else:
+        return 0
+
+churn_data['gender'] = churn_data['gender'].map({'Female':1, 'Male':0})
+churn_data['MultipleLines'] = churn_data['MultipleLines'].map({'Yes':1, 'No':0,'No phone service':0})
+churn_data['InternetService'] = churn_data['InternetService'].map({'DSL':1, 'Fiber optic':0,'No':0})
+churn_data['OnlineSecurity'] = churn_data['OnlineSecurity'].map({'Yes':1, 'No':0,'No internet service':0})
+churn_data['OnlineBackup'] = churn_data['OnlineBackup'].map({'Yes':1, 'No':0,'No internet service':0})
+churn_data['DeviceProtection'] = churn_data['DeviceProtection'].map({'Yes':1, 'No':0,'No internet service':0})
+churn_data['TechSupport'] = churn_data['TechSupport'].map({'Yes':1, 'No':0,'No internet service':0})
+churn_data['StreamingTV'] = churn_data['StreamingTV'].map({'Yes':1, 'No':0,'No internet service':0})
+churn_data['StreamingMovies'] = churn_data['StreamingMovies'].map({'Yes':1, 'No':0,'No internet service':0})
+churn_data['PhoneService'] = churn_data['PhoneService'].apply(converter)
+churn_data['PaperlessBilling'] = churn_data['PaperlessBilling'].apply(converter)
+churn_data['Churn'] = churn_data['Churn'].apply(converter)
+print(churn_data.head(2))
+
+categorical_features = ['Contract']
+churn_final_data = pd.get_dummies(churn_data, columns = categorical_features)
+print(churn_final_data.info())
+print(churn_final_data.head(2))
+
+churn_final_data.drop(['customerID','SeniorCitizen','Partner','Dependents','PaymentMethod'],axis=1,inplace=True)
+
+print(churn_final_data.head(2))
+
+churn_corrs = churn_final_data.corr()
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+plt.figure(figsize=(11,11))
+sns.heatmap(churn_corrs,cmap='RdBu',center=0,vmin=-1,vmax=1,annot=True,fmt='.1f',linewidth=2)
+
+#5.Logistic Regression-**
+
+X = churn_final_data.drop('Churn', axis = 1) # Features
+Y = churn_final_data['Churn'] # Labels
+print(type(X))
+print(type(Y))
+print(X.shape)
+print(Y.shape)
+
+from sklearn.linear_model import LogisticRegression 
+from sklearn.model_selection import train_test_split 
+X_train,X_test,y_train,y_test = train_test_split(X,Y,test_size=0.3,random_state=0) # Dataset is divided in 30% test data and 70% training data
+model=LogisticRegression(max_iter=1000,random_state=0)
+model.fit(X_train, y_train)
+
+y_pred=model.predict(X_test)
+y_pred
+
+print(model.score(X_train,y_train))
+print(model.score(X_test,y_test))
+
+#Evaluating Logistic Regression
+
+#Classifier evaluation:
+
+final_pred = [] 
+for i in y_pred:
+    if i > 0.5:
+      final_pred.append(1)
+    else:
+        final_pred.append(0) 
+yhat=final_pred  
+df=pd.DataFrame({"Prediction":yhat,"Actual":y_test})
+df
+
+#Accuracy of classification:
+
+from sklearn.metrics import accuracy_score, confusion_matrix, precision_score, recall_score 
+ ## Evaluate predictions
+print(  confusion_matrix(y_test, yhat))
+print('accuracy',accuracy_score(y_test, yhat))
+#print(y_test.shape)
+
+#As per above result 253 is false negative value and 168 false positive value. Since, we have high false negative value we have take recall score into consideration.
+
+#Precision and Recall:
+
+
+from sklearn.metrics import precision_score
+precision = precision_score(y_test, y_pred,average='binary')
+print('Precision: %.3f' % precision)
+from sklearn.metrics import recall_score
+recall = recall_score(y_test, y_pred)
+print('Recall: %.3f' % recall)
+#X_train.shape
+
+#Precision score = 0.641 and Recall score = 0.542
+
+import imblearn
+print(imblearn.__version__)
+
+# define oversampling strategy
+from imblearn.over_sampling import RandomOverSampler
+from collections import Counter
+oversample = RandomOverSampler(sampling_strategy='minority')
+# fit and apply the transform
+X_over, y_over = oversample.fit_resample(X, Y)
+print(Counter(Y))
+#X_over.shape
+print(Counter(y_over))
+print(X.shape)
+X_over.shape
+
+X_train,X_test,y_train,y_test=train_test_split(X_over,y_over,test_size=0.3,random_state=0) # testset is 30%
+
+model1=LogisticRegression(max_iter=10000, random_state=43)
+model1.fit(X_train, y_train)
+pred_lr=model1.predict(X_test)
+pred_lr
+
+pred_bin = [] 
+for x in pred_lr:
+    if x > 0.5:
+      pred_bin.append(1)
+    else:
+        pred_bin.append(0)
+
+print(accuracy_score(y_test, pred_bin))
+print( confusion_matrix(y_test, pred_bin))
+
+precision = precision_score(y_test, pred_bin,average='binary')
+print('Precision: %.3f' % precision)
+recall = recall_score(y_test, pred_bin)
+print('Recall: %.3f' % recall)
+
+from sklearn.metrics import f1_score
+f1score = f1_score(y_test, pred_bin,average='weighted')
+print('f1_score: %.3f' % f1score)
+
+#Accuracy with K-Fold Cross validation:
+
+from sklearn.model_selection import KFold
+from sklearn.model_selection import cross_val_score
+
+kfold = KFold(n_splits=10, random_state=100, shuffle=True)
+model2= LogisticRegression(max_iter=10000,random_state=1)
+results_kfold = cross_val_score(model2, X_over, y_over, cv=kfold)
+print(results_kfold)
+print('Accuracy with 10 fold cross validation: ',results_kfold.mean()*100.0)
+
+from sklearn.model_selection import cross_val_predict
+
+y_pred1 = cross_val_predict(model2, X_over, y_over, cv=10)
+conf_mat = confusion_matrix(y_over, y_pred1)
+conf_mat
+
+#Stochastic Gradient Decent-
+
+from sklearn.model_selection import train_test_split as tts
+X_train, X_test,y_train,y_test = tts(X_over,y_over)
+
+from sklearn.linear_model import SGDClassifier
+sgdc = SGDClassifier(loss="log", max_iter=10000,penalty='l1',random_state=43,alpha=0.0001).fit(X_train,y_train)
+
+y_pred = sgdc.predict(X_test)
+y_pred
+
+sgdc.score(X_train, y_train)
+
+sgdc.score(X_test,y_test)
+
+from sklearn.model_selection import GridSearchCV
+
+params = {'max_iter':[1000,10000,20000],'penalty':['l1','l2','elasticnet'],'alpha':[0.0001,0.005,0.001]}
+grid_search = GridSearchCV(sgdc,params,cv=5)
+grid_search.fit(X_train,y_train)
+
+grid_search.best_params_
+
+grid_search.best_score_
+
+from sklearn.linear_model import SGDClassifier
+sgdc = SGDClassifier(loss="log", max_iter=1000,penalty='l1',random_state=43,alpha=0.005).fit(X_train,y_train)
+
+y_pred = sgdc.predict(X_test)
+y_pred
+
+sgdc.score(X_train,y_train)
+
+sgdc.score(X_test,y_test)
+
+from sklearn import metrics as mt
+print(mt.confusion_matrix(y_test,y_pred))
+
+from sklearn.metrics import classification_report
+print(classification_report(y_test,y_pred))
+
+mt.precision_score(y_test,y_pred)
+
+mt.recall_score(y_test,y_pred)
+
+from sklearn.model_selection import cross_val_score
+c_score = cross_val_score(sgdc,X,Y,cv=5)
+
+c_score
+
+c_score.mean()
+
+#Again finding the *Accuracy* with K-fold:
+
+from sklearn.model_selection import KFold
+from sklearn.model_selection import cross_val_score
+
+kfold = KFold(n_splits=10, random_state=100, shuffle=True)
+model2= LogisticRegression(max_iter=10000,random_state=1)
+results_kfold = cross_val_score(model2, X_over, y_over, cv=kfold)
+print(results_kfold)
+print('Accuracy with 10 fold cross validation: ',results_kfold.mean()*100.0)
+
+#We have used 10 folds in cross validation and found 76.15% accuracy
+
+from sklearn.model_selection import cross_val_predict
+
+y_pred1 = cross_val_predict(model2, X_over, y_over, cv=10)
+conf_mat = confusion_matrix(y_over, y_pred1)
+conf_mat
